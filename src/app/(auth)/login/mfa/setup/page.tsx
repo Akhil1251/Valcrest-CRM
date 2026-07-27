@@ -21,6 +21,7 @@ export default async function MfaSetupPage({
   // Create new MFA factor
   const { data, error } = await supabase.auth.mfa.enroll({
     factorType: 'totp',
+    friendlyName: `Valcrest CRM Authenticator (${Date.now()})`
   })
 
   if (error) {
