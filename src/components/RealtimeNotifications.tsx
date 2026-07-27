@@ -30,6 +30,8 @@ export default function RealtimeNotifications() {
     const supabase = createClient()
     let lastCount = -1
     let titleInterval: NodeJS.Timeout
+    let interval: NodeJS.Timeout
+    let channel: any
 
     const showInAppToast = (message: string) => {
       setToastMessage(message)
@@ -68,44 +70,80 @@ export default function RealtimeNotifications() {
       }
     }
 
-    // 1. Foolproof Polling Fallback
-    const checkNewInquiries = async () => {
-      const { count } = await supabase
-        .from('inquiries')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'Pending')
+    let currentUser: any = null
+    let isUserAdmin = false
 
-      const currentCount = count || 0
-      
-      if (lastCount !== -1 && currentCount > lastCount) {
-        console.log('Polling detected new inquiry!')
-        router.refresh()
-        triggerUltimateAlert('You received a new website inquiry!')
+    const setupNotifications = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        currentUser = user
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+        if (profile?.role === 'admin') {
+          isUserAdmin = true
+        }
       }
-      lastCount = currentCount
+
+      // 1. Foolproof Polling Fallback (Only for Admins for new website leads)
+      const checkNewInquiries = async () => {
+        if (!isUserAdmin) return // Only admins care about unassigned new leads
+        
+        const { count } = await supabase
+          .from('inquiries')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'Pending')
+          .is('assigned_to', null) // Only count unassigned
+
+        const currentCount = count || 0
+        
+        if (lastCount !== -1 && currentCount > lastCount) {
+          console.log('Polling detected new inquiry!')
+          router.refresh()
+          triggerUltimateAlert('You received a new website inquiry!')
+        }
+        lastCount = currentCount
+      }
+
+      checkNewInquiries()
+      interval = setInterval(checkNewInquiries, 5000)
+
+      // 2. Supabase Realtime
+      channel = supabase.channel('global_notifications')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'inquiries' },
+          (payload) => {
+            if (isUserAdmin) {
+              console.log('Admin received new lead event:', payload)
+              router.refresh()
+              const newInquiry = payload.new as any
+              triggerUltimateAlert(`You received a new inquiry from ${newInquiry.name}`)
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'inquiries' },
+          (payload) => {
+            const newInquiry = payload.new as any
+            const oldInquiry = payload.old as any
+            
+            // If the inquiry was just assigned to THIS user
+            if (currentUser && newInquiry.assigned_to === currentUser.id && oldInquiry.assigned_to !== currentUser.id) {
+              console.log('Employee received assignment event:', payload)
+              router.refresh()
+              triggerUltimateAlert(`Admin just assigned a lead to you: ${newInquiry.name}`)
+            }
+          }
+        )
+        .subscribe()
     }
 
-    checkNewInquiries()
-    const interval = setInterval(checkNewInquiries, 5000)
-
-    // 2. Supabase Realtime (Instant)
-    const channel = supabase.channel('global_notifications')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'inquiries' },
-        (payload) => {
-          console.log('Realtime Event Received:', payload)
-          router.refresh()
-          const newInquiry = payload.new as any
-          triggerUltimateAlert(`You received a new inquiry from ${newInquiry.name}`)
-        }
-      )
-      .subscribe()
+    setupNotifications()
 
     return () => {
-      clearInterval(interval)
-      clearInterval(titleInterval)
-      supabase.removeChannel(channel)
+      if (interval) clearInterval(interval)
+      if (titleInterval) clearInterval(titleInterval)
+      if (channel) supabase.removeChannel(channel)
       document.title = originalTitle.current
     }
   }, [router])

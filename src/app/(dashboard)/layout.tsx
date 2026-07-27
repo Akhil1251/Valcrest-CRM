@@ -25,6 +25,18 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     redirect('/login/mfa')
   }
   
+  // Fetch user profile role
+  let role = 'user'
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    if (profile) role = profile.role
+  }
+  
+  const isAdmin = role === 'admin'
   const displayUser = user || { email: 'demo@valcrest.com' }
 
   // Fetch pending inquiries count
@@ -48,7 +60,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           </Link>
         </div>
         
-        <SidebarNavigation initialUnreadInquiries={unreadInquiries} />
+        <SidebarNavigation initialUnreadInquiries={unreadInquiries} isAdmin={isAdmin} />
 
         <div className="p-4 border-t border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-3 mb-4">
@@ -57,7 +69,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
             </div>
             <div className="flex-1 overflow-hidden">
               <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{displayUser.email}</p>
-              <p className="text-xs text-slate-500 truncate">Employee</p>
+              <p className="text-xs text-slate-500 truncate">{isAdmin ? 'Admin' : 'Employee'}</p>
             </div>
           </div>
           <form action="/auth/signout" method="post">

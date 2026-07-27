@@ -18,10 +18,12 @@ export default async function InquiriesPage() {
   // Fetch all profiles for the assignment dropdown (only if admin)
   let allUsers: any[] = []
   if (isAdmin) {
-    const { data: profiles } = await supabase
+    const { data: profiles, error: usersError } = await supabase
       .from('profiles')
-      .select('id, email, first_name, last_name')
+      .select('id, email')
       .order('email')
+    
+    if (usersError) console.error('Error fetching profiles:', usersError)
     if (profiles) allUsers = profiles
   }
 

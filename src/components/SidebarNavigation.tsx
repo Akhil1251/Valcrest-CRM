@@ -39,7 +39,7 @@ function NavItem({ href, icon: Icon, label, badge }: NavItemProps) {
   )
 }
 
-export default function SidebarNavigation({ initialUnreadInquiries }: { initialUnreadInquiries: number }) {
+export default function SidebarNavigation({ initialUnreadInquiries, isAdmin }: { initialUnreadInquiries: number, isAdmin?: boolean }) {
   const [unreadInquiries, setUnreadInquiries] = useState(initialUnreadInquiries)
   const pathname = usePathname()
 
@@ -84,10 +84,12 @@ export default function SidebarNavigation({ initialUnreadInquiries }: { initialU
       <NavItem href="/dwr" icon={FileText} label="Daily Work Report" />
       <NavItem href="/leaves" icon={CalendarDays} label="Leaves" />
       
-      <div className="pt-4 mt-4 border-t border-slate-200 dark:border-slate-800">
-        <p className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Admin</p>
-        <NavItem href="/users" icon={Users} label="Manage Users" />
-      </div>
+      {isAdmin && (
+        <div className="pt-4 mt-4 border-t border-slate-200 dark:border-slate-800">
+          <p className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Admin</p>
+          <NavItem href="/users" icon={Users} label="Manage Users" />
+        </div>
+      )}
     </nav>
   )
 }
