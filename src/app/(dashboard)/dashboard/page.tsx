@@ -1,5 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card' // We'll create these later or use standard tailwind classes for now.
+
 import { Users, Megaphone, FileText, CalendarDays } from 'lucide-react'
 
 export default async function DashboardPage() {
