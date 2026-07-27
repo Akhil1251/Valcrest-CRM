@@ -63,7 +63,7 @@ export default function RealtimeNotifications() {
       if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
         new Notification('New CRM Inquiry!', {
           body: message,
-          icon: '/favicon.ico'
+          icon: '/favicon.png'
         })
       }
     }
@@ -117,7 +117,7 @@ export default function RealtimeNotifications() {
         if (permission === 'granted') {
           new Notification('Notifications Enabled!', {
             body: 'You will now receive pop-ups for new inquiries.',
-            icon: '/favicon.ico'
+            icon: '/favicon.png'
           })
         }
       })

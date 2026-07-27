@@ -18,6 +18,13 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   if (!user) {
     redirect('/login')
   }
+  
+  // STRICT SECURITY: Prevent users from bypassing the MFA screen by navigating directly to /dashboard
+  const { data: mfaData, error: mfaError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+  if (mfaError || (mfaData.nextLevel === 'aal2' && mfaData.nextLevel !== mfaData.currentLevel)) {
+    redirect('/login/mfa')
+  }
+  
   const displayUser = user || { email: 'demo@valcrest.com' }
 
   // Fetch pending inquiries count
