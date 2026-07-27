@@ -2,16 +2,12 @@ import Link from 'next/link'
 import { ReactNode } from 'react'
 import {
   Shield,
-  LayoutDashboard,
-  Users,
-  Megaphone,
-  MessageSquare,
-  FileText,
-  CalendarDays,
   LogOut,
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
+import SidebarNavigation from '@/components/SidebarNavigation'
+import RealtimeNotifications from '@/components/RealtimeNotifications'
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient()
@@ -24,8 +20,18 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   }
   const displayUser = user || { email: 'demo@valcrest.com' }
 
+  // Fetch pending inquiries count
+  const { count, error } = await supabase
+    .from('inquiries')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'Pending')
+
+  const unreadInquiries = count || 0
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex">
+      <RealtimeNotifications />
+      
       {/* Sidebar */}
       <aside className="w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col hidden md:flex sticky top-0 h-screen">
         <div className="h-16 flex items-center px-6 border-b border-slate-200 dark:border-slate-800">
@@ -34,18 +40,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
             Valcrest CRM
           </Link>
         </div>
-        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-          <NavItem href="/dashboard" icon={LayoutDashboard} label="Dashboard" />
-          <NavItem href="/leads" icon={Megaphone} label="Leads" />
-          <NavItem href="/inquiries" icon={MessageSquare} label="Inquiries" />
-          <NavItem href="/dwr" icon={FileText} label="Daily Work Report" />
-          <NavItem href="/leaves" icon={CalendarDays} label="Leaves" />
-          
-          <div className="pt-4 mt-4 border-t border-slate-200 dark:border-slate-800">
-            <p className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Admin</p>
-            <NavItem href="/users" icon={Users} label="Manage Users" />
-          </div>
-        </nav>
+        
+        <SidebarNavigation initialUnreadInquiries={unreadInquiries} />
+
         <div className="p-4 border-t border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 font-bold">
@@ -78,17 +75,5 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         </div>
       </main>
     </div>
-  )
-}
-
-function NavItem({ href, icon: Icon, label }: { href: string; icon: any; label: string }) {
-  return (
-    <Link
-      href={href}
-      className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors"
-    >
-      <Icon className="w-4 h-4 text-slate-500" />
-      {label}
-    </Link>
   )
 }
