@@ -94,10 +94,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       
       {/* Sidebar (Desktop Only) */}
       <aside className="w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex-col hidden md:flex sticky top-0 h-screen">
-        <div className="h-16 flex items-center px-6 border-b border-slate-200 dark:border-slate-800 shrink-0">
-          <Link href="/dashboard" className="flex items-center gap-2 font-bold text-lg text-slate-900 dark:text-white">
-            <Shield className="w-6 h-6 text-indigo-600" />
-            Valcrest CRM
+        <div className="h-20 flex items-center px-6 border-b border-slate-200 dark:border-slate-800 shrink-0">
+          <Link href="/dashboard" className="flex items-center gap-2 font-bold text-lg text-slate-900 dark:text-white py-2">
+            <img src="/logo.png" alt="Valcrest Logo" className="h-16 w-auto object-contain" />
           </Link>
         </div>
         
@@ -130,10 +129,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-h-screen">
         {/* Mobile Header */}
-        <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-6 md:hidden sticky top-0 z-30">
-          <Link href="/dashboard" className="flex items-center gap-2 font-bold text-lg text-slate-900 dark:text-white">
-            <Shield className="w-6 h-6 text-indigo-600" />
-            Valcrest CRM
+        <header className="h-20 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-6 md:hidden sticky top-0 z-30">
+          <Link href="/dashboard" className="flex items-center gap-2 font-bold text-lg text-slate-900 dark:text-white py-2">
+            <img src="/logo.png" alt="Valcrest Logo" className="h-16 w-auto object-contain" />
           </Link>
         </header>
         
