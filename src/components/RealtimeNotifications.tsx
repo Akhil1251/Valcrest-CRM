@@ -224,15 +224,15 @@ export default function RealtimeNotifications() {
     <>
       {/* In-App Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-6 right-6 bg-white dark:bg-slate-900 border-l-4 border-indigo-500 shadow-2xl rounded-lg p-4 z-[100] flex items-start gap-4 min-w-[300px] animate-in slide-in-from-right-8 fade-in">
-          <div className="bg-indigo-100 dark:bg-indigo-900/50 p-2 rounded-full">
+        <div className="fixed top-20 md:top-6 right-4 left-4 md:left-auto md:right-6 bg-white dark:bg-slate-900 border-l-4 border-indigo-500 shadow-2xl rounded-lg p-4 z-[100] flex items-start gap-4 md:min-w-[300px] animate-in slide-in-from-top-8 md:slide-in-from-right-8 fade-in">
+          <div className="bg-indigo-100 dark:bg-indigo-900/50 p-2 rounded-full shrink-0">
             <MessageSquare className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
           </div>
           <div className="flex-1 pt-0.5">
             <p className="text-sm font-bold text-slate-900 dark:text-white">New CRM Inquiry!</p>
             <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">{toastMessage}</p>
           </div>
-          <button onClick={() => setToastMessage(null)} className="text-slate-400 hover:text-slate-600">
+          <button onClick={() => setToastMessage(null)} className="text-slate-400 hover:text-slate-600 shrink-0">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -240,7 +240,7 @@ export default function RealtimeNotifications() {
 
       {/* Permission Prompt */}
       {(perm === 'default' || perm === 'denied') && (
-        <div className="fixed bottom-4 right-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl rounded-lg p-4 z-50 animate-in slide-in-from-bottom-5">
+        <div className="fixed bottom-20 md:bottom-4 right-4 left-4 md:left-auto md:w-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl rounded-lg p-4 z-50 animate-in slide-in-from-bottom-5">
           <p className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-3">
             Enable desktop pop-ups for new leads?
           </p>
