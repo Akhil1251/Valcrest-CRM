@@ -1,5 +1,6 @@
 import { ShieldCheck } from 'lucide-react'
 import { verifyMfa } from './actions'
+import SubmitButton from '@/components/SubmitButton'
 
 export default async function MfaPage({
   searchParams,
@@ -41,9 +42,9 @@ export default async function MfaPage({
           />
         </div>
 
-        <button className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors shadow-sm mt-2">
+        <SubmitButton loadingText="Verifying Code...">
           Verify Code
-        </button>
+        </SubmitButton>
         
         {message && (
           <p className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-center text-sm rounded-lg border border-red-100 dark:border-red-900/50">

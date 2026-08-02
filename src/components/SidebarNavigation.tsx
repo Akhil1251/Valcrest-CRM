@@ -39,7 +39,17 @@ function NavItem({ href, icon: Icon, label, badge }: NavItemProps) {
   )
 }
 
-export default function SidebarNavigation({ initialUnreadInquiries, isAdmin }: { initialUnreadInquiries: number, isAdmin?: boolean }) {
+export default function SidebarNavigation({ 
+  initialUnreadInquiries, 
+  initialUnreadLeaves = 0,
+  initialUnreadDWRs = 0,
+  isAdmin 
+}: { 
+  initialUnreadInquiries: number
+  initialUnreadLeaves?: number
+  initialUnreadDWRs?: number
+  isAdmin?: boolean 
+}) {
   const [unreadInquiries, setUnreadInquiries] = useState(initialUnreadInquiries)
   const pathname = usePathname()
 
@@ -81,8 +91,8 @@ export default function SidebarNavigation({ initialUnreadInquiries, isAdmin }: {
       <NavItem href="/dashboard" icon={LayoutDashboard} label="Dashboard" />
       <NavItem href="/leads" icon={Megaphone} label="Leads" />
       <NavItem href="/inquiries" icon={MessageSquare} label="Inquiries" badge={unreadInquiries} />
-      <NavItem href="/dwr" icon={FileText} label="Daily Work Report" />
-      <NavItem href="/leaves" icon={CalendarDays} label="Leaves" />
+      <NavItem href="/dwr" icon={FileText} label="Daily Work Report" badge={initialUnreadDWRs} />
+      <NavItem href="/leaves" icon={CalendarDays} label="Leaves" badge={initialUnreadLeaves} />
       
       {isAdmin && (
         <div className="pt-4 mt-4 border-t border-slate-200 dark:border-slate-800">

@@ -107,7 +107,9 @@ export default function RealtimeNotifications() {
       interval = setInterval(checkNewInquiries, 5000)
 
       // 2. Supabase Realtime
-      channel = supabase.channel('global_notifications')
+      // Use a unique name to prevent "already subscribed" errors in React Strict Mode
+      const channelName = `global_notifications_${Math.random().toString(36).substring(7)}`
+      channel = supabase.channel(channelName)
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'inquiries' },
@@ -132,6 +134,62 @@ export default function RealtimeNotifications() {
               console.log('Employee received assignment event:', payload)
               router.refresh()
               triggerUltimateAlert(`Admin just assigned a lead to you: ${newInquiry.name}`)
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'leaves' },
+          (payload) => {
+            if (isUserAdmin) {
+              console.log('Admin received new leave event:', payload)
+              router.refresh()
+              triggerUltimateAlert(`New leave request submitted!`)
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'leaves' },
+          (payload) => {
+            const newLeave = payload.new as any
+            const oldLeave = payload.old as any
+            
+            // If the user's leave was approved or rejected
+            if (currentUser && newLeave.user_id === currentUser.id) {
+              if (newLeave.status !== oldLeave.status && newLeave.status !== 'Pending') {
+                console.log('User received leave status update:', payload)
+                router.refresh()
+                triggerUltimateAlert(`Your leave request was ${newLeave.status}!`)
+              }
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'daily_work_reports' },
+          (payload) => {
+            if (isUserAdmin) {
+              console.log('Admin received new DWR event:', payload)
+              router.refresh()
+              triggerUltimateAlert(`New Daily Work Report submitted!`)
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'daily_work_reports' },
+          (payload) => {
+            const newDWR = payload.new as any
+            const oldDWR = payload.old as any
+            
+            // If the user's DWR was reviewed
+            if (currentUser && newDWR.user_id === currentUser.id) {
+              if (newDWR.status !== oldDWR.status && newDWR.status !== 'Pending') {
+                console.log('User received DWR status update:', payload)
+                router.refresh()
+                triggerUltimateAlert(`Your Daily Work Report has been reviewed!`)
+              }
             }
           }
         )

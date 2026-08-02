@@ -161,7 +161,7 @@ export default function InquiriesClient({
             <table className="w-full text-left text-sm whitespace-nowrap">
               <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200 dark:border-slate-800">
                 <tr>
-                  <th className="px-6 py-4 w-10">
+                  <th className="px-4 md:px-6 py-4 w-10">
                     <input 
                       type="checkbox" 
                       className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer w-4 h-4"
@@ -169,12 +169,12 @@ export default function InquiriesClient({
                       onChange={handleSelectAll}
                     />
                   </th>
-                  <th className="px-6 py-4 w-10"></th>
-                  <th className="px-6 py-4">Name</th>
-                  <th className="px-6 py-4">Contact</th>
-                  <th className="px-6 py-4">Status</th>
-                  {isAdmin && <th className="px-6 py-4">Assigned To</th>}
-                  <th className="px-6 py-4">Date</th>
+                  <th className="px-2 md:px-6 py-4 w-10"></th>
+                  <th className="px-4 md:px-6 py-4">Name</th>
+                  <th className="hidden md:table-cell px-6 py-4">Contact</th>
+                  <th className="px-4 md:px-6 py-4">Status</th>
+                  {isAdmin && <th className="hidden lg:table-cell px-6 py-4">Assigned To</th>}
+                  <th className="hidden md:table-cell px-6 py-4">Date</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -190,7 +190,7 @@ export default function InquiriesClient({
                         }
                       }}
                     >
-                      <td className="px-6 py-4 align-top w-10" onClick={e => e.stopPropagation()}>
+                      <td className="px-4 md:px-6 py-4 align-top w-10" onClick={e => e.stopPropagation()}>
                         <input 
                           type="checkbox" 
                           className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer w-4 h-4"
@@ -198,7 +198,7 @@ export default function InquiriesClient({
                           onChange={(e) => handleSelectOne(e, inquiry.id)}
                         />
                       </td>
-                      <td className="px-6 py-4 align-top w-10">
+                      <td className="px-2 md:px-6 py-4 align-top w-10">
                         <div className="flex items-center gap-2 mt-0.5">
                           {inquiry.status === 'Pending' && (
                             <span className="relative flex h-2.5 w-2.5">
@@ -209,21 +209,21 @@ export default function InquiriesClient({
                           {expandedId === inquiry.id ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
                         </div>
                       </td>
-                      <td className="px-6 py-4 font-medium text-slate-900 dark:text-white align-top">
+                      <td className="px-4 md:px-6 py-4 font-medium text-slate-900 dark:text-white align-top">
                         {inquiry.name}
-                        <div className="text-xs font-normal text-slate-500 mt-1 max-w-[200px] truncate" title={inquiry.message}>
+                        <div className="text-xs font-normal text-slate-500 mt-1 max-w-[120px] sm:max-w-[200px] truncate" title={inquiry.message}>
                           {inquiry.message.substring(0, 40)}...
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-slate-500 align-top">
+                      <td className="hidden md:table-cell px-6 py-4 text-slate-500 align-top">
                         <div>{inquiry.email}</div>
                         <div className="text-xs mt-1">{inquiry.phone || 'No phone'}</div>
                       </td>
-                      <td className="px-6 py-4 align-top" onClick={e => e.stopPropagation()}>
+                      <td className="px-4 md:px-6 py-4 align-top" onClick={e => e.stopPropagation()}>
                         <select 
                           defaultValue={inquiry.status}
                           onChange={(e) => updateInquiryStatus(inquiry.id, e.target.value)}
-                          className={`bg-transparent border rounded-md py-1 px-2 text-xs font-medium cursor-pointer focus:ring-2 focus:ring-indigo-500 outline-none
+                          className={`bg-transparent border rounded-md py-1 px-1 md:px-2 text-xs font-medium cursor-pointer focus:ring-2 focus:ring-indigo-500 outline-none w-[100px] md:w-auto
                             ${inquiry.status === 'Pending' ? 'border-red-200 text-red-700 bg-red-50' :
                             ['Connected', 'Hot', 'Warm'].includes(inquiry.status) ? 'border-orange-200 text-orange-700 bg-orange-50' :
                             ['Not Connected', 'Cold', 'Lost', 'Not Interested'].includes(inquiry.status) ? 'border-slate-200 text-slate-700 bg-slate-100' :
@@ -234,13 +234,13 @@ export default function InquiriesClient({
                         </select>
                       </td>
                       {isAdmin && (
-                        <td className="px-6 py-4 align-top" onClick={e => e.stopPropagation()}>
+                        <td className="hidden lg:table-cell px-6 py-4 align-top" onClick={e => e.stopPropagation()}>
                           <div className="flex items-center gap-2">
                             <UserPlus className="w-4 h-4 text-slate-400" />
                             <select 
                               defaultValue={inquiry.assigned_to || ''}
                               onChange={(e) => assignInquiry(inquiry.id, e.target.value || null)}
-                              className="bg-transparent border border-slate-200 dark:border-slate-700 rounded-md py-1 px-2 text-xs font-medium cursor-pointer"
+                              className="bg-transparent border border-slate-200 dark:border-slate-700 rounded-md py-1 px-2 text-xs font-medium cursor-pointer max-w-[130px]"
                             >
                               <option value="">Unassigned</option>
                               {users.map(u => (
@@ -250,7 +250,7 @@ export default function InquiriesClient({
                           </div>
                         </td>
                       )}
-                      <td className="px-6 py-4 text-slate-500 align-top">
+                      <td className="hidden md:table-cell px-6 py-4 text-slate-500 align-top">
                         {new Date(inquiry.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                       </td>
                     </tr>
@@ -262,6 +262,37 @@ export default function InquiriesClient({
                           <div className="bg-slate-50/50 dark:bg-slate-900/50 p-6 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row gap-8 shadow-inner">
                             {/* Message Details */}
                             <div className="flex-1">
+                              {/* Mobile-only Extra Details */}
+                              <div className="lg:hidden mb-4 p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 text-sm flex flex-col gap-3 shadow-sm">
+                                <div className="flex justify-between items-center md:hidden">
+                                  <span className="text-slate-500">Contact:</span>
+                                  <span className="font-medium text-slate-900 dark:text-white text-right">
+                                    {inquiry.email}<br/><span className="text-xs text-slate-500">{inquiry.phone || 'No phone'}</span>
+                                  </span>
+                                </div>
+                                <div className="flex justify-between items-center md:hidden">
+                                  <span className="text-slate-500">Date:</span>
+                                  <span className="font-medium text-slate-900 dark:text-white">
+                                    {new Date(inquiry.created_at).toLocaleDateString()}
+                                  </span>
+                                </div>
+                                {isAdmin && (
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-slate-500">Assigned To:</span>
+                                    <select 
+                                      defaultValue={inquiry.assigned_to || ''}
+                                      onChange={(e) => assignInquiry(inquiry.id, e.target.value || null)}
+                                      className="bg-transparent border border-slate-200 dark:border-slate-700 rounded-md py-1.5 px-2 text-xs font-medium cursor-pointer max-w-[150px]"
+                                    >
+                                      <option value="">Unassigned</option>
+                                      {users.map(u => (
+                                        <option key={u.id} value={u.id}>{u.email}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                )}
+                              </div>
+
                               <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
                                 <FileText className="w-4 h-4 text-indigo-500" /> Original Message
                               </h4>

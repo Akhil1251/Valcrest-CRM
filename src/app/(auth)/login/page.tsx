@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { login } from './actions'
 import { Shield } from 'lucide-react'
+import SubmitButton from '@/components/SubmitButton'
 
 export default async function LoginPage({
   searchParams,
@@ -51,9 +52,9 @@ export default async function LoginPage({
           />
         </div>
 
-        <button className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors shadow-sm mt-2">
+        <SubmitButton loadingText="Signing In...">
           Sign In
-        </button>
+        </SubmitButton>
         
         {message && (
           <p className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-center text-sm rounded-lg border border-red-100 dark:border-red-900/50">
