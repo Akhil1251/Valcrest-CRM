@@ -238,18 +238,33 @@ export default function RealtimeNotifications() {
         </div>
       )}
 
-      {/* Permission Prompt */}
-      {(perm === 'default' || perm === 'denied') && (
-        <div className="fixed bottom-20 md:bottom-4 right-4 left-4 md:left-auto md:w-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl rounded-lg p-4 z-50 animate-in slide-in-from-bottom-5">
-          <p className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-3">
-            Enable desktop pop-ups for new leads?
-          </p>
-          <button 
-            onClick={requestPermission}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-1.5 rounded transition-colors w-full"
-          >
-            Enable OS Notifications
-          </button>
+      {/* Permission Modal */}
+      {(perm === 'default') && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 md:p-8 max-w-sm w-full animate-in zoom-in-95 duration-300 relative">
+            <button onClick={() => setPerm('dismissed')} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+              <X className="w-5 h-5" />
+            </button>
+            <div className="w-14 h-14 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center mb-5 mx-auto">
+              <MessageSquare className="w-7 h-7" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white text-center mb-2">Enable Notifications</h3>
+            <p className="text-slate-600 dark:text-slate-400 text-center text-sm mb-6 leading-relaxed">
+              Never miss a lead! Get instant alerts for new inquiries and team updates, even when you're not actively using the app.
+            </p>
+            <button 
+              onClick={requestPermission}
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl transition-colors shadow-sm shadow-indigo-500/20"
+            >
+              Allow Notifications
+            </button>
+            <button 
+              onClick={() => setPerm('dismissed')}
+              className="w-full mt-2 bg-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 font-semibold py-2.5 rounded-xl transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              Maybe Later
+            </button>
+          </div>
         </div>
       )}
     </>
