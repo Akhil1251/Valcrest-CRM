@@ -43,8 +43,9 @@ export async function createUser(data: FormData) {
     const email = data.get('email') as string
     const password = data.get('password') as string
     const role = data.get('role') as string
+    const full_name = data.get('full_name') as string
 
-    if (!email || !password || !role) {
+    if (!email || !password || !role || !full_name) {
       return { error: 'Missing required fields' }
     }
 
@@ -62,15 +63,19 @@ export async function createUser(data: FormData) {
     // 2. Wait a moment for the database trigger to create the profile
     await new Promise(resolve => setTimeout(resolve, 500))
 
-    // 3. Update the role in the profiles table if they are an admin
-    if (role === 'admin') {
+    // 3. Update the profile (role and full_name)
+    const profileUpdates: any = {}
+    if (role === 'admin') profileUpdates.role = 'admin'
+    if (full_name) profileUpdates.full_name = full_name
+
+    if (Object.keys(profileUpdates).length > 0) {
       const { error: updateError } = await adminClient
         .from('profiles')
-        .update({ role: 'admin' })
+        .update(profileUpdates)
         .eq('id', authData.user.id)
 
       if (updateError) {
-        console.error('Failed to update role:', updateError)
+        console.error('Failed to update profile:', updateError)
       }
     }
 
@@ -90,6 +95,7 @@ export async function updateUser(id: string, data: FormData) {
     const email = data.get('email') as string
     const password = data.get('password') as string
     const role = data.get('role') as string
+    const full_name = data.get('full_name') as string
 
     // 1. Update Auth User (Email/Password)
     const updates: any = {}
@@ -103,11 +109,15 @@ export async function updateUser(id: string, data: FormData) {
       }
     }
 
-    // 2. Update Role
-    if (role) {
+    // 2. Update Role and Full Name
+    const profileUpdates: any = {}
+    if (role) profileUpdates.role = role === 'admin' ? 'admin' : 'user'
+    if (full_name) profileUpdates.full_name = full_name
+
+    if (Object.keys(profileUpdates).length > 0) {
       const { error: updateError } = await adminClient
         .from('profiles')
-        .update({ role: role === 'admin' ? 'admin' : 'user' })
+        .update(profileUpdates)
         .eq('id', id)
 
       if (updateError) {

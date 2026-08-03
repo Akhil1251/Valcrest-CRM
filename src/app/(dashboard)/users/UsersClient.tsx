@@ -8,6 +8,7 @@ type Profile = {
   id: string
   email: string
   role: string
+  full_name?: string
   created_at: string
 }
 
@@ -92,6 +93,7 @@ export default function UsersClient({ users, currentUserId }: { users: Profile[]
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200 dark:border-slate-800">
               <tr>
+                <th scope="col" className="px-6 py-4">Name</th>
                 <th scope="col" className="px-6 py-4">Email</th>
                 <th scope="col" className="px-6 py-4">Role</th>
                 <th scope="col" className="px-6 py-4 text-right">Actions</th>
@@ -101,10 +103,13 @@ export default function UsersClient({ users, currentUserId }: { users: Profile[]
               {users.map((user) => (
                 <tr key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/25 transition-colors">
                   <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
-                    {user.email}
+                    {user.full_name || 'N/A'}
                     {user.id === currentUserId && (
                       <span className="ml-2 text-xs text-indigo-500 font-normal">(You)</span>
                     )}
+                  </td>
+                  <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
+                    {user.email}
                   </td>
                   <td className="px-6 py-4">
                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold ${
@@ -161,6 +166,17 @@ export default function UsersClient({ users, currentUserId }: { users: Profile[]
                 </div>
               )}
               
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Full Name</label>
+                <input 
+                  type="text" 
+                  name="full_name"
+                  required
+                  className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                  placeholder="e.g. John Doe"
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email Address</label>
                 <input 
@@ -239,6 +255,17 @@ export default function UsersClient({ users, currentUserId }: { users: Profile[]
                 </div>
               )}
               
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Full Name</label>
+                <input 
+                  type="text" 
+                  name="full_name"
+                  defaultValue={editUser.full_name}
+                  required
+                  className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email Address</label>
                 <input 

@@ -32,6 +32,7 @@ export async function createLead(formData: FormData) {
   const source = formData.get('source') as string
   const pipeline_id = formData.get('pipeline_id') as string
   const stage_id = formData.get('stage_id') as string
+  const assigned_to = formData.get('assigned_to') as string
 
   if (!name || !pipeline_id || !stage_id) {
     return { error: 'Name, Pipeline, and Stage are required' }
@@ -45,6 +46,7 @@ export async function createLead(formData: FormData) {
       source,
       pipeline_id,
       stage_id,
+      assigned_to: assigned_to || null,
     }
   ])
 
@@ -101,4 +103,178 @@ export async function createPipeline(name: string, stages: string[]) {
 
   revalidatePath('/leads')
   return { success: true, pipelineId: pipeline.id }
+}
+
+export async function updateLeadDetails(leadId: string, updates: any) {
+  const supabase = await createClient()
+
+  // Convert empty string to null for assigned_to
+  if (updates.assigned_to === "") {
+    updates.assigned_to = null
+  }
+
+  const { error } = await supabase
+    .from('leads')
+    .update(updates)
+    .eq('id', leadId)
+
+  if (error) {
+    console.error('Update Lead Error:', error.message)
+    return { error: error.message }
+  }
+
+  // Log the activity
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    await supabase.from('activity_logs').insert({
+      action_type: 'LEAD_EDIT',
+      description: `Updated lead owner/pipeline details.`,
+      user_id: user.id
+    })
+  }
+
+  revalidatePath('/leads')
+  return { success: true }
+}
+
+export async function importLeadsBulk(leadsData: any[]) {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('leads')
+    .insert(leadsData)
+
+  if (error) {
+    console.error('Import Leads Error:', error.message)
+    return { error: error.message }
+  }
+
+  // Log the activity
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    await supabase.from('activity_logs').insert({
+      action_type: 'BULK_IMPORT',
+      description: `Bulk imported ${leadsData.length} leads via CSV.`,
+      user_id: user.id
+    })
+  }
+
+  revalidatePath('/leads')
+  return { success: true }
+}
+
+export async function deleteLeadsBulk(leadIds: string[]) {
+  const supabase = await createClient()
+  
+  if (!leadIds || leadIds.length === 0) return { error: 'No leads provided' }
+
+  const { error } = await supabase
+    .from('leads')
+    .delete()
+    .in('id', leadIds)
+
+  if (error) {
+    console.error('Delete Leads Bulk Error:', error.message)
+    return { error: error.message }
+  }
+
+  // Log the activity
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    await supabase.from('activity_logs').insert({
+      action_type: 'BULK_DELETE',
+      description: `Bulk deleted ${leadIds.length} leads.`,
+      user_id: user.id
+    })
+  }
+
+  revalidatePath('/leads')
+  return { success: true }
+}
+
+export async function updateLeadsBulk(leadIds: string[], updates: { pipeline_id?: string, stage_id?: string, assigned_to?: string | null }) {
+  const supabase = await createClient()
+
+  if (!leadIds || leadIds.length === 0) return { error: 'No leads provided' }
+
+  const { error } = await supabase
+    .from('leads')
+    .update(updates)
+    .in('id', leadIds)
+
+  if (error) {
+    console.error('Update Leads Bulk Error:', error.message)
+    return { error: error.message }
+  }
+
+  // Log the activity
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    let actionDesc = `Bulk updated ${leadIds.length} leads.`
+    if (updates.stage_id) actionDesc = `Bulk moved ${leadIds.length} leads to a new stage.`
+    if (updates.assigned_to !== undefined) actionDesc = `Bulk assigned ${leadIds.length} leads to a new owner.`
+
+    await supabase.from('activity_logs').insert({
+      action_type: 'BULK_EDIT',
+      description: actionDesc,
+      user_id: user.id
+    })
+  }
+
+  revalidatePath('/leads')
+  return { success: true }
+}
+
+export async function getLeadNotes(leadId: string) {
+  const supabase = await createClient()
+
+  const { data: rawNotes, error } = await supabase
+    .from('lead_notes')
+    .select('*')
+    .eq('lead_id', leadId)
+    .order('created_at', { ascending: false })
+
+  if (error) return { error: error.message, notes: [] }
+
+  const { data: allProfiles } = await supabase
+    .from('profiles')
+    .select('id, full_name, email')
+
+  const notes = (rawNotes || []).map(note => {
+    const profile = allProfiles?.find(p => p.id === note.user_id)
+    return {
+      ...note,
+      profiles: profile || null
+    }
+  })
+
+  return { notes }
+}
+
+export async function addLeadNote(leadId: string, content: string) {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { error } = await supabase.from('lead_notes').insert({
+    lead_id: leadId,
+    content,
+    user_id: user.id
+  })
+
+  if (error) {
+    console.error('Add Lead Note Error:', error.message)
+    return { error: error.message }
+  }
+
+  // Also log it as a general activity
+  await supabase.from('activity_logs').insert({
+    action_type: 'ADD_NOTE',
+    description: `Added a note to a lead.`,
+    user_id: user.id
+  })
+
+  revalidatePath('/leads')
+  return { success: true }
 }
