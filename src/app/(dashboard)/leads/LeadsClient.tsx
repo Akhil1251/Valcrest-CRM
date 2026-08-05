@@ -194,6 +194,7 @@ export default function LeadsClient({ initialLeads, pipelines, stages, users, is
 
   const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set())
   const [isBulkEditModalOpen, setIsBulkEditModalOpen] = useState(false)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [bulkEditPipelineId, setBulkEditPipelineId] = useState<string>('')
 
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
@@ -249,6 +250,22 @@ export default function LeadsClient({ initialLeads, pipelines, stages, users, is
   async function handleCreateLead(formData: FormData) {
     setIsSubmitting(true)
     setError('')
+    
+    const name = formData.get('name') as string
+    const email = formData.get('email') as string
+    
+    // Uniqueness validation
+    const isDuplicate = leads.some(l => 
+      l.name.toLowerCase() === name.trim().toLowerCase() ||
+      (email && l.email?.toLowerCase() === email.trim().toLowerCase())
+    )
+    
+    if (isDuplicate) {
+      setError('A lead with this name or email already exists. Please use a unique name and email.')
+      setIsSubmitting(false)
+      return
+    }
+
     formData.append('pipeline_id', activePipelineId)
     formData.append('stage_id', currentStages[0]?.id || '')
 
@@ -413,9 +430,32 @@ export default function LeadsClient({ initialLeads, pipelines, stages, users, is
       skipEmptyLines: true,
       complete: async (results) => {
         const rows = results.data as any[]
-        setBulkProgressModal({ isOpen: true, status: 'saving', total: rows.length, current: 0 })
+        const uniqueNewLeads: any[] = []
+        const skippedNames: string[] = []
         
-        const newLeads = rows.map((row, index) => {
+        rows.forEach(row => {
+          const rowName = (row['Name'] || '').trim()
+          const rowEmail = (row['Email'] || '').trim()
+          
+          if (!rowName) return
+          
+          // Check against existing system leads
+          const existsInSystem = leads.some(l => 
+            l.name.toLowerCase() === rowName.toLowerCase() || 
+            (rowEmail && l.email?.toLowerCase() === rowEmail.toLowerCase())
+          )
+          
+          // Check against leads already processed in this batch
+          const existsInBatch = uniqueNewLeads.some(l => 
+            l.name.toLowerCase() === rowName.toLowerCase() ||
+            (rowEmail && l.email?.toLowerCase() === rowEmail.toLowerCase())
+          )
+          
+          if (existsInSystem || existsInBatch) {
+            skippedNames.push(rowName)
+            return
+          }
+          
           // Find matching stage by name (case insensitive)
           const targetStageName = row['Stage']?.trim().toLowerCase()
           const matchedStage = currentStages.find(s => s.name.toLowerCase() === targetStageName)
@@ -427,33 +467,39 @@ export default function LeadsClient({ initialLeads, pipelines, stages, users, is
           if (assignedInput) {
             const matchedUser = users.find(u => 
               (u.full_name && u.full_name.trim().replace(/\s+/g, ' ').toLowerCase() === assignedInput) || 
-              (u.email.trim().toLowerCase() === assignedInput)
+              (u.email.trim().toLowerCase() === assignedInput) ||
+              (u.email.split('@')[0].toLowerCase() === assignedInput)
             )
             if (matchedUser) {
               assigned_to = matchedUser.id
             }
           }
 
-          setBulkProgressModal(prev => ({ ...prev, current: index + 1 }))
-
-          return {
-            name: row['Name'] || 'Unknown Lead',
-            email: row['Email'] || null,
+          uniqueNewLeads.push({
+            name: rowName,
+            email: rowEmail || null,
             phone: row['Phone'] || null,
             source: row['Source'] || 'CSV Import',
             pipeline_id: activePipelineId,
             stage_id: stage_id,
             assigned_to: assigned_to,
-          }
+          })
         })
 
-        if (newLeads.length > 0) {
-          const res = await importLeadsBulk(newLeads)
+        if (uniqueNewLeads.length > 0) {
+          setBulkProgressModal({ isOpen: true, status: 'saving', total: uniqueNewLeads.length, current: 0 })
+          const res = await importLeadsBulk(uniqueNewLeads)
           if (res.error) {
             setBulkProgressModal(prev => ({ ...prev, status: 'done', error: res.error }))
           } else {
-            setBulkProgressModal(prev => ({ ...prev, status: 'done', current: newLeads.length }))
+            let errorMsg = undefined
+            if (skippedNames.length > 0) {
+              errorMsg = `Saved ${uniqueNewLeads.length} leads. Skipped ${skippedNames.length} duplicates.`
+            }
+            setBulkProgressModal(prev => ({ ...prev, status: 'done', current: uniqueNewLeads.length, error: errorMsg }))
           }
+        } else if (skippedNames.length > 0) {
+          setBulkProgressModal(prev => ({ ...prev, status: 'done', error: `All ${skippedNames.length} leads were skipped because they already exist.` }))
         } else {
           setBulkProgressModal(prev => ({ ...prev, status: 'done', error: 'No valid rows found.' }))
         }
@@ -932,13 +978,7 @@ export default function LeadsClient({ initialLeads, pipelines, stages, users, is
               <Edit2 className="w-3.5 h-3.5" /> Edit Selection
             </button>
             <button 
-              onClick={async () => {
-                if(confirm(`Delete ${selectedLeadIds.size} leads permanently?`)) {
-                  const { deleteLeadsBulk } = await import('./actions')
-                  await deleteLeadsBulk(Array.from(selectedLeadIds))
-                  window.location.reload()
-                }
-              }} 
+              onClick={() => setIsDeleteModalOpen(true)} 
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white text-sm font-medium transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" /> Delete
@@ -1030,6 +1070,41 @@ export default function LeadsClient({ initialLeads, pipelines, stages, users, is
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-sm border border-slate-200 dark:border-slate-800 overflow-hidden text-center p-6 animate-in zoom-in-95">
+            <div className="mx-auto w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-4">
+              <Trash2 className="w-6 h-6 text-red-600 dark:text-red-500" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Delete {selectedLeadIds.size} leads?</h2>
+            <p className="text-sm text-slate-500 mb-6">
+              Are you sure you want to delete these leads permanently? This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button 
+                onClick={() => setIsDeleteModalOpen(false)} 
+                className="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors w-full"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={async () => {
+                  setIsSubmitting(true)
+                  const { deleteLeadsBulk } = await import('./actions')
+                  await deleteLeadsBulk(Array.from(selectedLeadIds))
+                  window.location.reload()
+                }} 
+                disabled={isSubmitting}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50 w-full"
+              >
+                {isSubmitting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
           </div>
         </div>
       )}

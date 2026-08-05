@@ -5,30 +5,70 @@ import { Users, Megaphone, FileText, CalendarDays } from 'lucide-react'
 export default async function DashboardPage() {
   const supabase = await createClient()
   
-  // Here we would fetch real stats from the database
-  // For now we use placeholders
+  const { data: { user } } = await supabase.auth.getUser()
+  let role = 'user'
+  
+  if (user) {
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    if (profile) role = profile.role
+  }
+
+  const isAdmin = role === 'admin'
+
+  // Fetch real stats
+  const fetchCount = async (table: string, filters: Record<string, any> = {}) => {
+    let query = supabase.from(table).select('*', { count: 'exact', head: true })
+    
+    for (const [key, value] of Object.entries(filters)) {
+      if (value === null) {
+        query = query.is(key, null)
+      } else {
+        query = query.eq(key, value)
+      }
+    }
+    
+    // Non-admins only see their own assigned/created items
+    if (!isAdmin) {
+      if (table === 'leads' || table === 'inquiries') {
+        query = query.eq('assigned_to', user?.id)
+      } else if (table === 'daily_work_reports' || table === 'leaves') {
+        query = query.eq('user_id', user?.id)
+      }
+    }
+    
+    const { count, error } = await query
+    if (error) console.error(`Error fetching count for ${table}:`, error)
+    return count || 0
+  }
+
+  // Define counts fetching
+  const leadsCount = await fetchCount('leads')
+  const inquiriesCount = await fetchCount('inquiries', { status: 'Pending' })
+  const dwrsCount = await fetchCount('daily_work_reports', { status: 'Pending' })
+  const leavesCount = await fetchCount('leaves', { status: 'Pending' })
+
   const stats = [
     {
-      title: 'Total Leads',
-      value: '142',
+      title: isAdmin ? 'Total Leads' : 'My Leads',
+      value: leadsCount.toString(),
       icon: Megaphone,
-      description: '+12% from last month',
+      description: isAdmin ? 'All leads in system' : 'Assigned to you',
     },
     {
-      title: 'Active Inquiries',
-      value: '28',
+      title: isAdmin ? 'Active Inquiries' : 'My Inquiries',
+      value: inquiriesCount.toString(),
       icon: Users,
-      description: '14 need immediate attention',
+      description: 'Pending attention',
     },
     {
-      title: 'DWRs Pending',
-      value: '5',
+      title: isAdmin ? 'DWRs Pending' : 'My Pending DWRs',
+      value: dwrsCount.toString(),
       icon: FileText,
-      description: 'Waiting for approval',
+      description: 'Waiting for review',
     },
     {
-      title: 'Leaves Approvals',
-      value: '2',
+      title: isAdmin ? 'Leaves Approvals' : 'My Pending Leaves',
+      value: leavesCount.toString(),
       icon: CalendarDays,
       description: 'Pending review',
     },

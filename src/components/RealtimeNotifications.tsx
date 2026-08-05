@@ -134,7 +134,28 @@ export default function RealtimeNotifications() {
               console.log('Employee received assignment event:', payload)
               router.refresh()
               triggerUltimateAlert(`Admin just assigned a lead to you: ${newInquiry.name}`)
+            } else {
+               // general update trigger
+               router.refresh()
             }
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'leads' },
+          (payload) => {
+            if (isUserAdmin) {
+              console.log('Admin received new manual lead event:', payload)
+              router.refresh()
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'leads' },
+          (payload) => {
+             // Just trigger refresh to keep dashboard live
+             router.refresh()
           }
         )
         .on(
@@ -159,10 +180,10 @@ export default function RealtimeNotifications() {
             if (currentUser && newLeave.user_id === currentUser.id) {
               if (newLeave.status !== oldLeave.status && newLeave.status !== 'Pending') {
                 console.log('User received leave status update:', payload)
-                router.refresh()
                 triggerUltimateAlert(`Your leave request was ${newLeave.status}!`)
               }
             }
+            router.refresh()
           }
         )
         .on(
@@ -187,10 +208,10 @@ export default function RealtimeNotifications() {
             if (currentUser && newDWR.user_id === currentUser.id) {
               if (newDWR.status !== oldDWR.status && newDWR.status !== 'Pending') {
                 console.log('User received DWR status update:', payload)
-                router.refresh()
                 triggerUltimateAlert(`Your Daily Work Report has been reviewed!`)
               }
             }
+            router.refresh()
           }
         )
         .subscribe()
