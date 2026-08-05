@@ -57,7 +57,6 @@ export default async function LeadsPage() {
       pipelines={pipelines || []}
       stages={stages || []}
       users={allUsers || []}
-      activityLogs={activityLogs || []}
       isAdmin={isAdmin}
       currentUserId={user.id}
     />
