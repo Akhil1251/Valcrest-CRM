@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { LayoutDashboard, Megaphone, MessageSquare, FileText, CalendarDays, Users } from 'lucide-react'
+import { LayoutDashboard, Megaphone, MessageSquare, FileText, CalendarDays, Users, ShoppingCart } from 'lucide-react'
 
 type NavItemProps = {
   href: string
@@ -98,6 +98,7 @@ export default function SidebarNavigation({
         <div className="pt-4 mt-4 border-t border-slate-200 dark:border-slate-800">
           <p className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Admin</p>
           <NavItem href="/users" icon={Users} label="Manage Users" />
+          <NavItem href="/purchases" icon={ShoppingCart} label="Purchases" />
         </div>
       )}
     </nav>
