@@ -75,7 +75,7 @@ function KanbanCard({ lead, users, onLeadClick, isSelected, toggleSelect }: { le
         <div className="flex justify-between items-center text-xs mb-1.5">
           <span className="text-slate-400 truncate pr-2">{lead.source || 'Website'}</span>
           <span className="bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-300 shrink-0">
-            {new Date(lead.created_at).toLocaleDateString()}
+            {new Date(lead.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
           </span>
         </div>
         
@@ -152,7 +152,7 @@ function MobileLeadCard({ lead, users, onMoveClick, onLeadClick, isSelected, tog
         <div className="flex justify-between items-center text-xs mt-1">
           <span className="text-slate-400 truncate pr-2">{lead.source || 'Website'}</span>
           <span className="bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-300 shrink-0">
-            {new Date(lead.created_at).toLocaleDateString()}
+            {new Date(lead.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
           </span>
         </div>
         

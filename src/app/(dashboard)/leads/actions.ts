@@ -1,7 +1,15 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
+
+const getAdminClient = () => {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 export async function getPipelines() {
   const supabase = await createClient()
@@ -168,6 +176,12 @@ export async function deleteLeadsBulk(leadIds: string[]) {
   
   if (!leadIds || leadIds.length === 0) return { error: 'No leads provided' }
 
+  // Fetch emails to clear purchases assignment later
+  const { data: leadsToDelete } = await supabase
+    .from('leads')
+    .select('email')
+    .in('id', leadIds)
+
   const { error } = await supabase
     .from('leads')
     .delete()
@@ -176,6 +190,18 @@ export async function deleteLeadsBulk(leadIds: string[]) {
   if (error) {
     console.error('Delete Leads Bulk Error:', error.message)
     return { error: error.message }
+  }
+
+  // Clear purchases assigned_to for these emails
+  if (leadsToDelete && leadsToDelete.length > 0) {
+    const emails = leadsToDelete.map((l: any) => l.email).filter(Boolean)
+    if (emails.length > 0) {
+      const supabaseAdmin = getAdminClient()
+      await supabaseAdmin
+        .from('purchases')
+        .update({ assigned_to: null })
+        .in('email', emails)
+    }
   }
 
   // Log the activity
@@ -189,6 +215,7 @@ export async function deleteLeadsBulk(leadIds: string[]) {
   }
 
   revalidatePath('/leads')
+  revalidatePath('/purchases')
   return { success: true }
 }
 
