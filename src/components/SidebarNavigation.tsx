@@ -51,32 +51,37 @@ export default function SidebarNavigation({
   isAdmin?: boolean 
 }) {
   const [unreadInquiries, setUnreadInquiries] = useState(initialUnreadInquiries)
+  const [unreadPurchases, setUnreadPurchases] = useState(0)
   const pathname = usePathname()
 
   useEffect(() => {
     const supabase = createClient()
 
-    // Foolproof polling to ensure the badge count is always perfectly in sync
-    // This catches status updates, bulk deletes, and new inserts
     const fetchCount = async () => {
       const { count } = await supabase
         .from('inquiries')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'Pending')
         
-      if (count !== null) {
-        setUnreadInquiries(count)
-      }
+      if (count !== null) setUnreadInquiries(count)
+
+      const { count: purchaseCount } = await supabase
+        .from('purchases')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'Successful')
+        
+      if (purchaseCount !== null) setUnreadPurchases(purchaseCount)
     }
 
-    // Run immediately and every 5 seconds
     fetchCount()
     const interval = setInterval(fetchCount, 5000)
 
-    // Also keep Realtime for instant UI updates on INSERT/UPDATE/DELETE
     const channel = supabase.channel('sidebar_badge')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'inquiries' }, () => {
-        fetchCount() // Instantly re-fetch count on any database change
+        fetchCount()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'purchases' }, () => {
+        fetchCount()
       })
       .subscribe()
 
@@ -98,7 +103,7 @@ export default function SidebarNavigation({
         <div className="pt-4 mt-4 border-t border-slate-200 dark:border-slate-800">
           <p className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Admin</p>
           <NavItem href="/users" icon={Users} label="Manage Users" />
-          <NavItem href="/purchases" icon={ShoppingCart} label="Purchases" />
+          <NavItem href="/purchases" icon={ShoppingCart} label="Purchases" badge={unreadPurchases} />
         </div>
       )}
     </nav>

@@ -1,19 +1,19 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
-import { CheckCircle2, IndianRupee } from 'lucide-react'
+import { CheckCircle2, IndianRupee, XCircle, Clock, RefreshCw } from 'lucide-react'
+import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export default async function PurchasesPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
     redirect('/login')
   }
 
-  // Check if admin
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
@@ -21,7 +21,7 @@ export default async function PurchasesPage() {
     .single()
 
   if (profile?.role !== 'admin') {
-    redirect('/dashboard') // Only admins can access purchases
+    redirect('/dashboard')
   }
 
   const { data: purchases, error } = await supabase
@@ -34,8 +34,12 @@ export default async function PurchasesPage() {
       <div className="flex justify-between items-end">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Purchases</h1>
-          <p className="text-slate-600 dark:text-slate-400 mt-1">View all successful package purchases from the website.</p>
+          <p className="text-slate-600 dark:text-slate-400 mt-1">View all package purchases from the website.</p>
         </div>
+        <Link href="/purchases" className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg text-sm font-medium transition-colors">
+          <RefreshCw className="w-4 h-4" />
+          Refresh
+        </Link>
       </div>
 
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
@@ -56,9 +60,7 @@ export default async function PurchasesPage() {
                   <tr key={purchase.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap text-slate-500 dark:text-slate-400">
                       {new Date(purchase.created_at).toLocaleDateString('en-IN', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric'
+                        day: '2-digit', month: 'short', year: 'numeric'
                       })}
                       <div className="text-xs mt-1">{new Date(purchase.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</div>
                     </td>
@@ -68,9 +70,23 @@ export default async function PurchasesPage() {
                       <div className="text-slate-500 dark:text-slate-400">{purchase.phone}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 font-medium text-xs mb-2">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        {purchase.plan_name}
+                      <div className="flex gap-2 mb-2">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-medium text-xs">
+                          {purchase.plan_name}
+                        </div>
+                        {purchase.status === 'Successful' || purchase.status === 'success' ? (
+                            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase tracking-wider">
+                                <CheckCircle2 className="w-3 h-3" /> SUCCESS
+                            </div>
+                        ) : purchase.status === 'Pending' ? (
+                            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-50 text-amber-700 text-[10px] font-bold uppercase tracking-wider">
+                                <Clock className="w-3 h-3" /> PENDING
+                            </div>
+                        ) : (
+                            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-50 text-red-700 text-[10px] font-bold uppercase tracking-wider">
+                                <XCircle className="w-3 h-3" /> FAILED
+                            </div>
+                        )}
                       </div>
                       <div className="font-bold text-slate-900 dark:text-white flex items-center">
                         <IndianRupee className="w-3.5 h-3.5 mr-0.5" />
