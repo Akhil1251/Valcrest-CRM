@@ -148,13 +148,17 @@ export async function updateLeadDetails(leadId: string, updates: any) {
 export async function importLeadsBulk(leadsData: any[]) {
   const supabase = await createClient()
 
-  const { error } = await supabase
-    .from('leads')
-    .insert(leadsData)
+  const chunkSize = 500;
+  for (let i = 0; i < leadsData.length; i += chunkSize) {
+    const chunk = leadsData.slice(i, i + chunkSize);
+    const { error } = await supabase
+      .from('leads')
+      .insert(chunk)
 
-  if (error) {
-    console.error('Import Leads Error:', error.message)
-    return { error: error.message }
+    if (error) {
+      console.error('Import Leads Error:', error.message)
+      return { error: error.message }
+    }
   }
 
   // Log the activity

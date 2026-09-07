@@ -34,6 +34,7 @@ export default async function LeadsPage() {
     .from('leads')
     .select('*')
     .order('created_at', { ascending: false })
+    .limit(30000)
 
   // Fetch pipelines
   const { data: pipelines, error: pipelinesError } = await supabase

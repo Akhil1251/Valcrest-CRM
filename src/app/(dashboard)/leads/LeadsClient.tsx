@@ -442,13 +442,15 @@ export default function LeadsClient({ initialLeads, pipelines, stages, users, is
           // Check against existing system leads
           const existsInSystem = leads.some(l => 
             l.name.toLowerCase() === rowName.toLowerCase() || 
-            (rowEmail && l.email?.toLowerCase() === rowEmail.toLowerCase())
+            (rowEmail && l.email?.toLowerCase() === rowEmail.toLowerCase()) ||
+            (row['Phone'] && l.phone === row['Phone'])
           )
           
           // Check against leads already processed in this batch
           const existsInBatch = uniqueNewLeads.some(l => 
             l.name.toLowerCase() === rowName.toLowerCase() ||
-            (rowEmail && l.email?.toLowerCase() === rowEmail.toLowerCase())
+            (rowEmail && l.email?.toLowerCase() === rowEmail.toLowerCase()) ||
+            (row['Phone'] && l.phone === row['Phone'])
           )
           
           if (existsInSystem || existsInBatch) {
