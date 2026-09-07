@@ -113,6 +113,72 @@ export async function createPipeline(name: string, stages: string[]) {
   return { success: true, pipelineId: pipeline.id }
 }
 
+export async function updatePipeline(pipelineId: string, name: string, stages: { id?: string, name: string }[]) {
+  const supabase = await createClient()
+
+  // 1. Update pipeline name
+  const { error: pipelineError } = await supabase
+    .from('pipelines')
+    .update({ name })
+    .eq('id', pipelineId)
+
+  if (pipelineError) return { error: pipelineError.message }
+
+  // 2. Fetch existing stages to know what to delete
+  const { data: existingStages } = await supabase
+    .from('pipeline_stages')
+    .select('id')
+    .eq('pipeline_id', pipelineId)
+    
+  const existingStageIds = existingStages?.map(s => s.id) || []
+  const newStageIds = stages.filter(s => s.id).map(s => s.id as string)
+  
+  // 3. Delete stages that were removed
+  const stagesToDelete = existingStageIds.filter(id => !newStageIds.includes(id))
+  
+  if (stagesToDelete.length > 0) {
+    // Check if any leads are in these stages
+    const { data: leadsInStages } = await supabase
+      .from('leads')
+      .select('id')
+      .in('stage_id', stagesToDelete)
+      .limit(1)
+      
+    if (leadsInStages && leadsInStages.length > 0) {
+      return { error: 'Cannot delete stages that contain leads. Please move the leads first.' }
+    }
+    
+    const { error: deleteError } = await supabase
+      .from('pipeline_stages')
+      .delete()
+      .in('id', stagesToDelete)
+      
+    if (deleteError) return { error: deleteError.message }
+  }
+
+  // 4. Update or insert stages
+  for (let i = 0; i < stages.length; i++) {
+    const stage = stages[i]
+    if (stage.id) {
+      // Update existing
+      const { error: updateError } = await supabase
+        .from('pipeline_stages')
+        .update({ name: stage.name, order_index: i + 1 })
+        .eq('id', stage.id)
+      if (updateError) return { error: updateError.message }
+    } else {
+      // Insert new
+      const { error: insertError } = await supabase
+        .from('pipeline_stages')
+        .insert({ pipeline_id: pipelineId, name: stage.name, order_index: i + 1 })
+      if (insertError) return { error: insertError.message }
+    }
+  }
+
+  revalidatePath('/leads')
+  return { success: true }
+}
+
 export async function updateLeadDetails(leadId: string, updates: any) {
   const supabase = await createClient()
 

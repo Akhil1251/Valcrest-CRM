@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { Megaphone, Upload, Plus, X, Settings2, ArrowRight, MoreVertical, Download, Edit2, User, Loader2, CheckCircle2, Trash2, Phone, MessageSquare, Save } from 'lucide-react'
+import { Megaphone, Upload, Plus, X, Settings2, ArrowRight, MoreVertical, Download, Edit2, User, Loader2, CheckCircle2, Trash2, Phone, MessageSquare, Save, Search } from 'lucide-react'
 import { DndContext, DragOverlay, closestCorners, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { useDroppable } from '@dnd-kit/core'
 import { useDraggable } from '@dnd-kit/core'
-import { createLead, updateLeadStage, updateLeadDetails, createPipeline, importLeadsBulk } from './actions'
+import { createLead, updateLeadStage, updateLeadDetails, createPipeline, updatePipeline, importLeadsBulk } from './actions'
 import Papa from 'papaparse'
 import { useRouter } from 'next/navigation'
 
@@ -175,10 +175,19 @@ export default function LeadsClient({ initialLeads, pipelines, stages, users, is
   const [leads, setLeads] = useState(initialLeads)
   const [activePipelineId, setActivePipelineId] = useState(pipelines[0]?.id || '')
   const [userFilter, setUserFilter] = useState('all')
+  const [searchQuery, setSearchQuery] = useState('')
   const router = useRouter()
   
   const [isNewLeadModalOpen, setIsNewLeadModalOpen] = useState(false)
   const [isNewPipelineModalOpen, setIsNewPipelineModalOpen] = useState(false)
+  const [isEditPipelineModalOpen, setIsEditPipelineModalOpen] = useState(false)
+  const [editStages, setEditStages] = useState<{id?: string, name: string}[]>([])
+
+  useEffect(() => {
+    if (isEditPipelineModalOpen) {
+      setEditStages(stages.filter(s => s.pipeline_id === activePipelineId).sort((a, b) => a.order_index - b.order_index).map(s => ({ id: s.id, name: s.name })))
+    }
+  }, [isEditPipelineModalOpen, activePipelineId, stages])
   
   // Unified Lead Details/Edit Modal
   const [activeLeadDetails, setActiveLeadDetails] = useState<Lead | null>(null)
@@ -216,12 +225,22 @@ export default function LeadsClient({ initialLeads, pipelines, stages, users, is
     return leads.filter(l => {
       if (l.pipeline_id !== activePipelineId) return false
       if (isAdmin && userFilter !== 'all') {
-        if (userFilter === 'unassigned') return !l.assigned_to
-        return l.assigned_to === userFilter
+        if (userFilter === 'unassigned') {
+          if (l.assigned_to) return false
+        } else {
+          if (l.assigned_to !== userFilter) return false
+        }
+      }
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase()
+        const matchName = l.name.toLowerCase().includes(q)
+        const matchEmail = l.email?.toLowerCase().includes(q)
+        const matchPhone = l.phone?.toLowerCase().includes(q)
+        if (!matchName && !matchEmail && !matchPhone) return false
       }
       return true
     })
-  }, [leads, activePipelineId, isAdmin, userFilter])
+  }, [leads, activePipelineId, isAdmin, userFilter, searchQuery])
 
   const newLeadCountsByUserId = useMemo(() => {
     const counts: Record<string, number> = {}
@@ -325,6 +344,34 @@ export default function LeadsClient({ initialLeads, pipelines, stages, users, is
     setNewNoteContent('')
     const res = await getLeadNotes(activeLeadDetails.id)
     if (!res.error) setLeadNotes(res.notes)
+    setIsSubmitting(false)
+  }
+
+  async function handleEditPipeline(e: React.FormEvent) {
+    e.preventDefault()
+    setIsSubmitting(true)
+    setError('')
+    const formData = new FormData(e.target as HTMLFormElement)
+    const name = formData.get('name') as string
+    
+    if (editStages.length === 0) {
+      setError('At least one stage is required')
+      setIsSubmitting(false)
+      return
+    }
+    if (editStages.some(s => !s.name.trim())) {
+      setError('Stage names cannot be empty')
+      setIsSubmitting(false)
+      return
+    }
+
+    const res = await updatePipeline(activePipelineId, name, editStages)
+    if (res.error) {
+      setError(res.error)
+    } else {
+      setIsEditPipelineModalOpen(false)
+      window.location.reload()
+    }
     setIsSubmitting(false)
   }
 
@@ -536,6 +583,16 @@ export default function LeadsClient({ initialLeads, pipelines, stages, users, is
         
         {/* Mobile Action Controls */}
         <div className="md:hidden flex flex-col gap-2 w-full min-w-0">
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Search leads..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/50"
+            />
+          </div>
           <div className="flex items-center gap-2 w-full min-w-0">
             <div className="flex items-center bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-1 flex-1 min-w-0">
               <select 
@@ -548,9 +605,14 @@ export default function LeadsClient({ initialLeads, pipelines, stages, users, is
                 ))}
               </select>
               {isAdmin && (
-                <button onClick={() => setIsNewPipelineModalOpen(true)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-slate-500 transition-colors shrink-0">
-                  <Settings2 className="w-4 h-4" />
-                </button>
+                <>
+                  <button onClick={() => setIsEditPipelineModalOpen(true)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-slate-500 transition-colors shrink-0" title="Edit Pipeline">
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => setIsNewPipelineModalOpen(true)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-slate-500 transition-colors shrink-0" title="Create Pipeline">
+                    <Settings2 className="w-4 h-4" />
+                  </button>
+                </>
               )}
             </div>
 
@@ -599,6 +661,16 @@ export default function LeadsClient({ initialLeads, pipelines, stages, users, is
 
         {/* Desktop Actions */}
         <div className="hidden md:flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Search leads..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-48 xl:w-64 pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/50 shadow-sm"
+            />
+          </div>
           {isAdmin && (
             <select 
               value={userFilter}
@@ -620,22 +692,27 @@ export default function LeadsClient({ initialLeads, pipelines, stages, users, is
               {pipelines.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
             {isAdmin && (
-              <button onClick={() => setIsNewPipelineModalOpen(true)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-slate-500 transition-colors">
-                <Settings2 className="w-4 h-4" />
-              </button>
+              <>
+                <button onClick={() => setIsEditPipelineModalOpen(true)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-slate-500 transition-colors" title="Edit Pipeline">
+                  <Edit2 className="w-4 h-4" />
+                </button>
+                <button onClick={() => setIsNewPipelineModalOpen(true)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-slate-500 transition-colors" title="Create Pipeline">
+                  <Settings2 className="w-4 h-4" />
+                </button>
+              </>
             )}
           </div>
 
           {isAdmin && (
             <>
-              <button onClick={handleDownloadTemplate} className="flex items-center justify-center gap-2 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 shadow-sm">
-                <Download className="w-4 h-4" /> Template
+              <button onClick={handleDownloadTemplate} title="Download Template" className="flex items-center justify-center p-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 shadow-sm">
+                <Download className="w-4 h-4" />
               </button>
-              <button onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center gap-2 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 shadow-sm">
-                <Upload className="w-4 h-4 text-indigo-600" /> Upload CSV
+              <button onClick={() => fileInputRef.current?.click()} title="Upload CSV" className="flex items-center justify-center p-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 shadow-sm">
+                <Upload className="w-4 h-4 text-indigo-600" />
               </button>
-              <button onClick={() => router.push('/logs')} className="flex items-center justify-center gap-2 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 shadow-sm">
-                <Settings2 className="w-4 h-4 text-slate-500" /> Logs
+              <button onClick={() => router.push('/logs')} title="Activity Logs" className="flex items-center justify-center p-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 shadow-sm">
+                <Settings2 className="w-4 h-4 text-slate-500" />
               </button>
             </>
           )}
@@ -934,6 +1011,64 @@ export default function LeadsClient({ initialLeads, pipelines, stages, users, is
                 <button type="button" onClick={() => setIsNewPipelineModalOpen(false)} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors">Cancel</button>
                 <button type="submit" disabled={isSubmitting} className="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white transition-colors disabled:opacity-50">
                   {isSubmitting ? 'Creating...' : 'Create Pipeline'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isEditPipelineModalOpen && isAdmin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-md border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center p-6 border-b border-slate-200 dark:border-slate-800 shrink-0">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white">Edit Pipeline</h2>
+              <button onClick={() => setIsEditPipelineModalOpen(false)} className="text-slate-400 hover:text-slate-500"><X className="w-5 h-5" /></button>
+            </div>
+            <form onSubmit={handleEditPipeline} className="p-6 flex flex-col gap-4 overflow-y-auto">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Pipeline Name *</label>
+                <input required name="name" defaultValue={pipelines.find(p => p.id === activePipelineId)?.name || ''} className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50" />
+              </div>
+              
+              <div className="flex flex-col gap-2 mt-2">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Stages (Order top to bottom)</label>
+                {editStages.map((stage, idx) => (
+                  <div key={idx} className="flex gap-2 items-center group">
+                    <input 
+                      required 
+                      value={stage.name}
+                      onChange={(e) => {
+                        const newStages = [...editStages];
+                        newStages[idx].name = e.target.value;
+                        setEditStages(newStages);
+                      }}
+                      className="flex-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50" 
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => setEditStages(editStages.filter((_, i) => i !== idx))}
+                      className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                <button 
+                  type="button" 
+                  onClick={() => setEditStages([...editStages, { name: '' }])}
+                  className="mt-2 self-start flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+                >
+                  <Plus className="w-4 h-4" /> Add Stage
+                </button>
+              </div>
+              
+              {error && <p className="text-red-500 text-sm mt-2 p-2 bg-red-50 dark:bg-red-900/20 rounded-md">{error}</p>}
+              
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
+                <button type="button" onClick={() => setIsEditPipelineModalOpen(false)} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors">Cancel</button>
+                <button type="submit" disabled={isSubmitting} className="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white transition-colors disabled:opacity-50">
+                  {isSubmitting ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </form>
