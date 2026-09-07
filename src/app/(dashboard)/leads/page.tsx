@@ -29,12 +29,37 @@ export default async function LeadsPage() {
     .order('created_at', { ascending: false })
     .limit(50)
 
-  // Fetch all leads
-  const { data: leads, error: leadsError } = await supabase
-    .from('leads')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(30000)
+  // Fetch all leads using pagination to bypass the 1000 row max limit
+  let allLeads: any[] = [];
+  let from = 0;
+  const step = 1000;
+  let leadsError = null;
+  
+  while (true) {
+    const { data, error } = await supabase
+      .from('leads')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, from + step - 1);
+      
+    if (error) {
+      leadsError = error;
+      break;
+    }
+    
+    if (data) {
+      allLeads = [...allLeads, ...data];
+    }
+    
+    if (!data || data.length < step) {
+      break;
+    }
+    
+    from += step;
+  }
+  
+  const leads = allLeads;
 
   // Fetch pipelines
   const { data: pipelines, error: pipelinesError } = await supabase

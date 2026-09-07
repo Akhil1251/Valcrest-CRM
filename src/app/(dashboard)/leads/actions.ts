@@ -180,20 +180,31 @@ export async function deleteLeadsBulk(leadIds: string[]) {
   
   if (!leadIds || leadIds.length === 0) return { error: 'No leads provided' }
 
-  // Fetch emails to clear purchases assignment later
-  const { data: leadsToDelete } = await supabase
-    .from('leads')
-    .select('email')
-    .in('id', leadIds)
+  let leadsToDelete: any[] = [];
+  const chunkSize = 200;
 
-  const { error } = await supabase
-    .from('leads')
-    .delete()
-    .in('id', leadIds)
+  for (let i = 0; i < leadIds.length; i += chunkSize) {
+    const chunk = leadIds.slice(i, i + chunkSize);
+    
+    // Fetch emails to clear purchases assignment later
+    const { data } = await supabase
+      .from('leads')
+      .select('email')
+      .in('id', chunk)
+      
+    if (data) {
+      leadsToDelete = [...leadsToDelete, ...data];
+    }
 
-  if (error) {
-    console.error('Delete Leads Bulk Error:', error.message)
-    return { error: error.message }
+    const { error } = await supabase
+      .from('leads')
+      .delete()
+      .in('id', chunk)
+
+    if (error) {
+      console.error('Delete Leads Bulk Error:', error.message)
+      return { error: error.message }
+    }
   }
 
   // Clear purchases assigned_to for these emails
@@ -201,10 +212,13 @@ export async function deleteLeadsBulk(leadIds: string[]) {
     const emails = leadsToDelete.map((l: any) => l.email).filter(Boolean)
     if (emails.length > 0) {
       const supabaseAdmin = getAdminClient()
-      await supabaseAdmin
-        .from('purchases')
-        .update({ assigned_to: null })
-        .in('email', emails)
+      for (let i = 0; i < emails.length; i += chunkSize) {
+        const emailChunk = emails.slice(i, i + chunkSize);
+        await supabaseAdmin
+          .from('purchases')
+          .update({ assigned_to: null })
+          .in('email', emailChunk)
+      }
     }
   }
 
@@ -228,14 +242,18 @@ export async function updateLeadsBulk(leadIds: string[], updates: { pipeline_id?
 
   if (!leadIds || leadIds.length === 0) return { error: 'No leads provided' }
 
-  const { error } = await supabase
-    .from('leads')
-    .update(updates)
-    .in('id', leadIds)
+  const chunkSize = 200;
+  for (let i = 0; i < leadIds.length; i += chunkSize) {
+    const chunk = leadIds.slice(i, i + chunkSize);
+    const { error } = await supabase
+      .from('leads')
+      .update(updates)
+      .in('id', chunk)
 
-  if (error) {
-    console.error('Update Leads Bulk Error:', error.message)
-    return { error: error.message }
+    if (error) {
+      console.error('Update Leads Bulk Error:', error.message)
+      return { error: error.message }
+    }
   }
 
   // Log the activity

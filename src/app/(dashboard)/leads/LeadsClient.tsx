@@ -187,7 +187,7 @@ export default function LeadsClient({ initialLeads, pipelines, stages, users, is
   const [newNoteContent, setNewNoteContent] = useState('')
   
   // Bulk Actions State
-  const [bulkProgressModal, setBulkProgressModal] = useState<{isOpen: boolean, status: 'uploading'|'saving'|'done', total: number, current: number, error?: string}>({ isOpen: false, status: 'done', total: 0, current: 0 })
+  const [bulkProgressModal, setBulkProgressModal] = useState<{isOpen: boolean, status: 'uploading'|'saving'|'done', total: number, current: number, error?: string, message?: string}>({ isOpen: false, status: 'done', total: 0, current: 0 })
   
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -494,11 +494,11 @@ export default function LeadsClient({ initialLeads, pipelines, stages, users, is
           if (res.error) {
             setBulkProgressModal(prev => ({ ...prev, status: 'done', error: res.error }))
           } else {
-            let errorMsg = undefined
+            let infoMsg = undefined
             if (skippedNames.length > 0) {
-              errorMsg = `Saved ${uniqueNewLeads.length} leads. Skipped ${skippedNames.length} duplicates.`
+              infoMsg = `Saved ${uniqueNewLeads.length} leads. Skipped ${skippedNames.length} duplicates.`
             }
-            setBulkProgressModal(prev => ({ ...prev, status: 'done', current: uniqueNewLeads.length, error: errorMsg }))
+            setBulkProgressModal(prev => ({ ...prev, status: 'done', current: uniqueNewLeads.length, message: infoMsg }))
           }
         } else if (skippedNames.length > 0) {
           setBulkProgressModal(prev => ({ ...prev, status: 'done', error: `All ${skippedNames.length} leads were skipped because they already exist.` }))
@@ -863,7 +863,7 @@ export default function LeadsClient({ initialLeads, pipelines, stages, users, is
                   {bulkProgressModal.error ? 'Import Failed' : 'Import Complete!'}
                 </h3>
                 <p className="text-slate-500 text-sm mb-6">
-                  {bulkProgressModal.error || `Successfully imported ${bulkProgressModal.current} leads and assigned owners based on matching names.`}
+                  {bulkProgressModal.error || bulkProgressModal.message || `Successfully imported ${bulkProgressModal.current} leads and assigned owners based on matching names.`}
                 </p>
                 <button onClick={() => router.push('/logs')} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-colors">
                   View Bulk Action Logs
