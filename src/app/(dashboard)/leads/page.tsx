@@ -2,6 +2,18 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import LeadsClient from './LeadsClient'
 
+type Lead = {
+  id: string
+  name: string
+  email?: string | null
+  phone?: string | null
+  source?: string | null
+  pipeline_id: string
+  stage_id: string
+  assigned_to?: string | null
+  created_at: string
+}
+
 export default async function LeadsPage() {
   const supabase = await createClient()
 
@@ -22,45 +34,6 @@ export default async function LeadsPage() {
     .select('id, email, full_name, role')
     .order('created_at', { ascending: false })
 
-  // Fetch activity logs (latest 50)
-  const { data: activityLogs } = await supabase
-    .from('activity_logs')
-    .select('*, profiles(full_name, email)')
-    .order('created_at', { ascending: false })
-    .limit(50)
-
-  // Fetch all leads using pagination to bypass the 1000 row max limit
-  let allLeads: any[] = [];
-  let from = 0;
-  const step = 1000;
-  let leadsError = null;
-  
-  while (true) {
-    const { data, error } = await supabase
-      .from('leads')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .order('id', { ascending: true })
-      .range(from, from + step - 1);
-      
-    if (error) {
-      leadsError = error;
-      break;
-    }
-    
-    if (data) {
-      allLeads = [...allLeads, ...data];
-    }
-    
-    if (!data || data.length < step) {
-      break;
-    }
-    
-    from += step;
-  }
-  
-  const leads = allLeads;
-
   // Fetch pipelines
   const { data: pipelines, error: pipelinesError } = await supabase
     .from('pipelines')
@@ -73,18 +46,67 @@ export default async function LeadsPage() {
     .select('*')
     .order('order_index', { ascending: true })
 
-  if (leadsError) console.error('Error fetching leads:', leadsError.message)
   if (pipelinesError) console.error('Error fetching pipelines:', pipelinesError.message)
   if (stagesError) console.error('Error fetching stages:', stagesError.message)
 
+  // Fetch exact count of leads per pipeline using fast HEAD requests (bypasses 1000 row max limit)
+  const initialPipelineLeadCounts: Record<string, number> = {}
+  if (pipelines && pipelines.length > 0) {
+    await Promise.all(
+      pipelines.map(async (p) => {
+        const { count, error } = await supabase
+          .from('leads')
+          .select('*', { count: 'exact', head: true })
+          .eq('pipeline_id', p.id)
+
+        if (!error && count !== null) {
+          initialPipelineLeadCounts[p.id] = count
+        }
+      })
+    )
+  }
+
+  // Fetch initial leads ONLY for the default/active pipeline using range pagination to retrieve all rows (bypassing 1000 row limit)
+  const defaultPipelineId = pipelines?.[0]?.id || ''
+  let initialLeads: Lead[] = []
+  
+  if (defaultPipelineId) {
+    let from = 0
+    const step = 1000
+    while (true) {
+      const { data: leadsData, error: leadsError } = await supabase
+        .from('leads')
+        .select('id, name, email, phone, source, pipeline_id, stage_id, assigned_to, created_at')
+        .eq('pipeline_id', defaultPipelineId)
+        .order('created_at', { ascending: false })
+        .range(from, from + step - 1)
+
+      if (leadsError) {
+        console.error('Error fetching initial leads:', leadsError.message)
+        break
+      }
+
+      if (leadsData && leadsData.length > 0) {
+        initialLeads = [...initialLeads, ...(leadsData as Lead[])]
+      }
+
+      if (!leadsData || leadsData.length < step) {
+        break
+      }
+
+      from += step
+    }
+  }
+
   return (
     <LeadsClient 
-      initialLeads={leads || []} 
+      initialLeads={initialLeads} 
       pipelines={pipelines || []}
       stages={stages || []}
       users={allUsers || []}
       isAdmin={isAdmin}
       currentUserId={user.id}
+      initialPipelineLeadCounts={initialPipelineLeadCounts}
     />
   )
 }

@@ -31,6 +31,110 @@ export async function getPipelines() {
   return { pipelines, stages }
 }
 
+/**
+ * Fetch leads ONLY for a specific pipeline with optional user / stage / search filtering.
+ * Uses range pagination to bypass Supabase's default 1000 row max limit,
+ * ensuring all 8k+ leads for the pipeline are retrieved.
+ */
+export async function getLeadsForPipeline(
+  pipelineId: string, 
+  filters?: { userFilter?: string; searchQuery?: string; stageId?: string }
+) {
+  const supabase = await createClient()
+  
+  let allLeads: Array<{
+    id: string
+    name: string
+    email?: string | null
+    phone?: string | null
+    source?: string | null
+    pipeline_id: string
+    stage_id: string
+    assigned_to?: string | null
+    created_at: string
+  }> = []
+  let from = 0
+  const step = 1000
+
+  while (true) {
+    let query = supabase
+      .from('leads')
+      .select('id, name, email, phone, source, pipeline_id, stage_id, assigned_to, created_at')
+      .eq('pipeline_id', pipelineId)
+      .order('created_at', { ascending: false })
+      .range(from, from + step - 1)
+
+    if (filters?.userFilter && filters.userFilter !== 'all') {
+      if (filters.userFilter === 'unassigned') {
+        query = query.is('assigned_to', null)
+      } else {
+        query = query.eq('assigned_to', filters.userFilter)
+      }
+    }
+
+    if (filters?.stageId && filters.stageId !== 'all') {
+      query = query.eq('stage_id', filters.stageId)
+    }
+
+    if (filters?.searchQuery) {
+      const q = filters.searchQuery.trim()
+      if (q) {
+        query = query.or(`name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%`)
+      }
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching leads for pipeline:', error.message)
+      return { error: error.message, leads: allLeads }
+    }
+
+    if (data && data.length > 0) {
+      allLeads = [...allLeads, ...data]
+    }
+
+    if (!data || data.length < step) {
+      break
+    }
+
+    from += step
+  }
+
+  return { leads: allLeads }
+}
+
+/**
+ * Exact lead counts per pipeline using fast HEAD queries (bypasses 1000 row max limit).
+ */
+export async function getPipelineLeadCounts() {
+  const supabase = await createClient()
+  const { data: pipelines, error: pipeError } = await supabase
+    .from('pipelines')
+    .select('id')
+  
+  if (pipeError || !pipelines) {
+    console.error('Error fetching pipelines for count:', pipeError?.message)
+    return { counts: {} }
+  }
+
+  const counts: Record<string, number> = {}
+  await Promise.all(
+    pipelines.map(async (p) => {
+      const { count, error } = await supabase
+        .from('leads')
+        .select('*', { count: 'exact', head: true })
+        .eq('pipeline_id', p.id)
+
+      if (!error && count !== null) {
+        counts[p.id] = count
+      }
+    })
+  )
+
+  return { counts }
+}
+
 export async function createLead(formData: FormData) {
   const supabase = await createClient()
 
@@ -46,17 +150,17 @@ export async function createLead(formData: FormData) {
     return { error: 'Name, Pipeline, and Stage are required' }
   }
 
-  const { error } = await supabase.from('leads').insert([
+  const { data, error } = await supabase.from('leads').insert([
     {
       name,
-      email,
-      phone,
-      source,
+      email: email || null,
+      phone: phone || null,
+      source: source || 'Direct',
       pipeline_id,
       stage_id,
       assigned_to: assigned_to || null,
     }
-  ])
+  ]).select().single()
 
   if (error) {
     console.error('Create Lead Error:', error.message)
@@ -64,7 +168,7 @@ export async function createLead(formData: FormData) {
   }
 
   revalidatePath('/leads')
-  return { success: true }
+  return { success: true, lead: data }
 }
 
 export async function updateLeadStage(leadId: string, stageId: string) {
@@ -103,24 +207,37 @@ export async function createPipeline(name: string, stages: string[]) {
     order_index: index + 1
   }))
 
-  const { error: stagesError } = await supabase
+  const { data: createdStages, error: stagesError } = await supabase
     .from('pipeline_stages')
     .insert(stageInserts)
+    .select()
 
   if (stagesError) return { error: stagesError.message }
 
+  // Log activity
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    await supabase.from('activity_logs').insert({
+      action_type: 'PIPELINE_CREATE',
+      description: `Created pipeline "${name}" with ${stages.length} stages.`,
+      user_id: user.id
+    })
+  }
+
   revalidatePath('/leads')
-  return { success: true, pipelineId: pipeline.id }
+  return { success: true, pipeline, stages: createdStages }
 }
 
 export async function updatePipeline(pipelineId: string, name: string, stages: { id?: string, name: string }[]) {
   const supabase = await createClient()
 
   // 1. Update pipeline name
-  const { error: pipelineError } = await supabase
+  const { data: updatedPipeline, error: pipelineError } = await supabase
     .from('pipelines')
     .update({ name })
     .eq('id', pipelineId)
+    .select()
+    .single()
 
   if (pipelineError) return { error: pipelineError.message }
 
@@ -157,29 +274,107 @@ export async function updatePipeline(pipelineId: string, name: string, stages: {
   }
 
   // 4. Update or insert stages
+  const savedStages: { id: string; name: string; order_index: number; pipeline_id: string }[] = []
   for (let i = 0; i < stages.length; i++) {
     const stage = stages[i]
     if (stage.id) {
       // Update existing
-      const { error: updateError } = await supabase
+      const { data, error: updateError } = await supabase
         .from('pipeline_stages')
         .update({ name: stage.name, order_index: i + 1 })
         .eq('id', stage.id)
+        .select()
+        .single()
       if (updateError) return { error: updateError.message }
+      if (data) savedStages.push(data)
     } else {
       // Insert new
-      const { error: insertError } = await supabase
+      const { data, error: insertError } = await supabase
         .from('pipeline_stages')
         .insert({ pipeline_id: pipelineId, name: stage.name, order_index: i + 1 })
+        .select()
+        .single()
       if (insertError) return { error: insertError.message }
+      if (data) savedStages.push(data)
     }
   }
+
+  // Log activity
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    await supabase.from('activity_logs').insert({
+      action_type: 'PIPELINE_EDIT',
+      description: `Updated pipeline "${name}".`,
+      user_id: user.id
+    })
+  }
+
+  revalidatePath('/leads')
+  return { success: true, pipeline: updatedPipeline, stages: savedStages }
+}
+
+export async function deletePipeline(pipelineId: string) {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (profile?.role !== 'admin') {
+    return { error: 'Only administrators can delete pipelines' }
+  }
+
+  // Ensure at least one pipeline remains
+  const { count } = await supabase
+    .from('pipelines')
+    .select('*', { count: 'exact', head: true })
+
+  if (count && count <= 1) {
+    return { error: 'Cannot delete the last pipeline. At least one pipeline is required.' }
+  }
+
+  // Get pipeline name
+  const { data: pipeline } = await supabase
+    .from('pipelines')
+    .select('name')
+    .eq('id', pipelineId)
+    .single()
+
+  const pipelineName = pipeline?.name || 'Pipeline'
+
+  // Count affected leads
+  const { count: affectedLeadsCount } = await supabase
+    .from('leads')
+    .select('*', { count: 'exact', head: true })
+    .eq('pipeline_id', pipelineId)
+
+  // Delete pipeline (cascade deletes pipeline_stages and leads)
+  const { error } = await supabase
+    .from('pipelines')
+    .delete()
+    .eq('id', pipelineId)
+
+  if (error) {
+    console.error('Delete Pipeline Error:', error.message)
+    return { error: error.message }
+  }
+
+  await supabase.from('activity_logs').insert({
+    action_type: 'PIPELINE_DELETE',
+    description: `Deleted pipeline "${pipelineName}" (contained ${affectedLeadsCount || 0} leads).`,
+    user_id: user.id
+  })
 
   revalidatePath('/leads')
   return { success: true }
 }
 
-export async function updateLeadDetails(leadId: string, updates: any) {
+export async function updateLeadDetails(leadId: string, updates: Record<string, unknown>) {
   const supabase = await createClient()
 
   // Convert empty string to null for assigned_to
@@ -187,10 +382,12 @@ export async function updateLeadDetails(leadId: string, updates: any) {
     updates.assigned_to = null
   }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('leads')
     .update(updates)
     .eq('id', leadId)
+    .select()
+    .single()
 
   if (error) {
     console.error('Update Lead Error:', error.message)
@@ -202,16 +399,16 @@ export async function updateLeadDetails(leadId: string, updates: any) {
   if (user) {
     await supabase.from('activity_logs').insert({
       action_type: 'LEAD_EDIT',
-      description: `Updated lead owner/pipeline details.`,
+      description: `Updated lead details for "${data.name}".`,
       user_id: user.id
     })
   }
 
   revalidatePath('/leads')
-  return { success: true }
+  return { success: true, lead: data }
 }
 
-export async function importLeadsBulk(leadsData: any[]) {
+export async function importLeadsBulk(leadsData: Record<string, unknown>[]) {
   const supabase = await createClient()
 
   const chunkSize = 500;
@@ -238,7 +435,7 @@ export async function importLeadsBulk(leadsData: any[]) {
   }
 
   revalidatePath('/leads')
-  return { success: true }
+  return { success: true, importedCount: leadsData.length }
 }
 
 export async function deleteLeadsBulk(leadIds: string[]) {
@@ -246,7 +443,7 @@ export async function deleteLeadsBulk(leadIds: string[]) {
   
   if (!leadIds || leadIds.length === 0) return { error: 'No leads provided' }
 
-  let leadsToDelete: any[] = [];
+  let leadsToDelete: { email?: string | null }[] = [];
   const chunkSize = 200;
 
   for (let i = 0; i < leadIds.length; i += chunkSize) {
@@ -275,7 +472,7 @@ export async function deleteLeadsBulk(leadIds: string[]) {
 
   // Clear purchases assigned_to for these emails
   if (leadsToDelete && leadsToDelete.length > 0) {
-    const emails = leadsToDelete.map((l: any) => l.email).filter(Boolean)
+    const emails = leadsToDelete.map((l: { email?: string | null }) => l.email).filter(Boolean) as string[]
     if (emails.length > 0) {
       const supabaseAdmin = getAdminClient()
       for (let i = 0; i < emails.length; i += chunkSize) {
@@ -300,7 +497,7 @@ export async function deleteLeadsBulk(leadIds: string[]) {
 
   revalidatePath('/leads')
   revalidatePath('/purchases')
-  return { success: true }
+  return { success: true, count: leadIds.length }
 }
 
 export async function updateLeadsBulk(leadIds: string[], updates: { pipeline_id?: string, stage_id?: string, assigned_to?: string | null }) {
@@ -337,7 +534,7 @@ export async function updateLeadsBulk(leadIds: string[], updates: { pipeline_id?
   }
 
   revalidatePath('/leads')
-  return { success: true }
+  return { success: true, count: leadIds.length }
 }
 
 export async function getLeadNotes(leadId: string) {
@@ -372,15 +569,23 @@ export async function addLeadNote(leadId: string, content: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  const { error } = await supabase.from('lead_notes').insert({
+  const { data: newNote, error } = await supabase.from('lead_notes').insert({
     lead_id: leadId,
     content,
     user_id: user.id
-  })
+  }).select('*, profiles(full_name, email)').single()
 
   if (error) {
-    console.error('Add Lead Note Error:', error.message)
-    return { error: error.message }
+    // If the join profiles doesn't work directly via select on insert, fetch or construct
+    const { error: insertError } = await supabase.from('lead_notes').insert({
+      lead_id: leadId,
+      content,
+      user_id: user.id
+    })
+    if (insertError) {
+      console.error('Add Lead Note Error:', insertError.message)
+      return { error: insertError.message }
+    }
   }
 
   // Also log it as a general activity
@@ -391,5 +596,5 @@ export async function addLeadNote(leadId: string, content: string) {
   })
 
   revalidatePath('/leads')
-  return { success: true }
+  return { success: true, note: newNote }
 }
