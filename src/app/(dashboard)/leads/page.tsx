@@ -26,7 +26,7 @@ export default async function LeadsPage() {
     .eq('id', user.id)
     .single()
 
-  const isAdmin = profile?.role === 'admin'
+  const isAdmin = profile?.role?.toLowerCase()?.trim() === 'admin'
 
   // Fetch all users for assignment mapping
   const { data: allUsers } = await supabase
@@ -69,7 +69,7 @@ export default async function LeadsPage() {
   // Fetch initial leads ONLY for the default/active pipeline using range pagination to retrieve all rows (bypassing 1000 row limit)
   const defaultPipelineId = pipelines?.[0]?.id || ''
   let initialLeads: Lead[] = []
-  
+
   if (defaultPipelineId) {
     let from = 0
     const step = 1000
@@ -99,8 +99,8 @@ export default async function LeadsPage() {
   }
 
   return (
-    <LeadsClient 
-      initialLeads={initialLeads} 
+    <LeadsClient
+      initialLeads={initialLeads}
       pipelines={pipelines || []}
       stages={stages || []}
       users={allUsers || []}

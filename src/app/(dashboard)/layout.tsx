@@ -19,13 +19,13 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   if (!user) {
     redirect('/login')
   }
-  
+
   // STRICT SECURITY: Prevent users from bypassing the MFA screen by navigating directly to /dashboard
   const { data: mfaData, error: mfaError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
   if (mfaError || (mfaData.nextLevel === 'aal2' && mfaData.nextLevel !== mfaData.currentLevel)) {
     redirect('/login/mfa')
   }
-  
+
   // Fetch user profile role
   let role = 'user'
   if (user) {
@@ -36,7 +36,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       .single()
     if (profile) role = profile.role
   }
-  
+
   const isAdmin = role === 'admin'
   const displayUser = user || { email: 'demo@valcrest.com' }
 
@@ -91,7 +91,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex">
       <RealtimeNotifications />
-      
+
       {/* Sidebar (Desktop Only) */}
       <aside className="w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex-col hidden md:flex sticky top-0 h-screen">
         <div className="h-16 flex items-center px-4 border-b border-slate-200 dark:border-slate-800 shrink-0 relative">
@@ -99,12 +99,12 @@ export default async function DashboardLayout({ children }: { children: ReactNod
             <img src="/logo.png" alt="Valcrest Logo" className="h-28 w-auto object-contain absolute top-1/2 -translate-y-1/2 left-2" />
           </Link>
         </div>
-        
-        <SidebarNavigation 
-          initialUnreadInquiries={unreadInquiries} 
+
+        <SidebarNavigation
+          initialUnreadInquiries={unreadInquiries}
           initialUnreadLeaves={unreadLeaves}
           initialUnreadDWRs={unreadDWRs}
-          isAdmin={isAdmin} 
+          isAdmin={isAdmin}
         />
 
         <div className="p-4 border-t border-slate-200 dark:border-slate-800 shrink-0">
@@ -127,28 +127,28 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-h-screen">
-        {/* Mobile Header */}
-        <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 md:hidden sticky top-0 z-30 relative overflow-hidden">
-          <Link href="/dashboard" className="flex items-center h-full w-full">
-            <img src="/logo.png" alt="Valcrest Logo" className="h-28 w-auto object-contain absolute top-1/2 -translate-y-1/2 left-2" />
-          </Link>
-        </header>
-        
-        {/* Content Area - Added pb-20 on mobile to account for the fixed bottom bar */}
-        <div className="flex-1 p-6 lg:p-8 max-w-7xl mx-auto w-full pb-24 md:pb-8">
-          {children}
-        </div>
-      </main>
+        <main className="flex-1 flex flex-col min-h-screen min-w-0 w-full overflow-x-hidden">
+          {/* Mobile Header */}
+          <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 md:hidden sticky top-0 z-30 relative overflow-hidden">
+            <Link href="/dashboard" className="flex items-center h-full w-full">
+              <img src="/logo.png" alt="Valcrest Logo" className="h-28 w-auto object-contain absolute top-1/2 -translate-y-1/2 left-2" />
+            </Link>
+          </header>
 
-      {/* Mobile Bottom Navigation Bar */}
-      <MobileBottomBar 
-        unreadInquiries={unreadInquiries} 
-        unreadLeaves={unreadLeaves}
-        unreadDWRs={unreadDWRs}
-        isAdmin={isAdmin} 
-        displayUser={displayUser} 
-      />
+          {/* Content Area - Responsive padding for mobile viewports */}
+            <div className="flex-1 p-3.5 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full min-w-0 pb-24 md:pb-8">
+              {children}
+            </div>
+        </main>
+
+        {/* Mobile Bottom Navigation Bar */}
+        <MobileBottomBar
+          unreadInquiries={unreadInquiries}
+          unreadLeaves={unreadLeaves}
+          unreadDWRs={unreadDWRs}
+          isAdmin={isAdmin}
+          displayUser={displayUser}
+        />
     </div>
   )
 }
