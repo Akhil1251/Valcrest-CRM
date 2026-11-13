@@ -95,17 +95,37 @@ function KanbanCard({
       </div>
       
       <div className="flex-1 min-w-0 flex flex-col h-full">
-        <div className="font-medium text-slate-900 dark:text-white flex items-start justify-between gap-2 leading-tight mb-1.5">
+        <div className="font-medium text-slate-900 dark:text-white flex items-start justify-between gap-2 leading-tight mb-1">
           <span className="truncate">{lead.name}</span>
           {lead.phone && (
-            <a href={`tel:${lead.phone}`} onClick={e => e.stopPropagation()} className="p-1 text-slate-400 hover:text-green-500 transition-colors shrink-0 -mt-1 -mr-1">
+            <a href={`tel:${lead.phone}`} onClick={e => e.stopPropagation()} className="p-1 text-slate-400 hover:text-green-500 transition-colors shrink-0 -mt-1 -mr-1" title={`Call ${lead.phone}`}>
               <Phone className="w-3.5 h-3.5" />
             </a>
           )}
         </div>
         
-        <div className="text-xs text-slate-500 truncate mb-1.5 h-4">
-          {lead.email || ''}
+        <div className="text-xs truncate mb-1.5 h-4 flex items-center gap-1.5">
+          {lead.phone ? (
+            <a 
+              href={`tel:${lead.phone}`} 
+              onClick={e => e.stopPropagation()} 
+              className="text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium inline-flex items-center gap-1 hover:underline truncate"
+              title={`Call ${lead.phone}`}
+            >
+              <Phone className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span className="truncate">{lead.phone}</span>
+            </a>
+          ) : lead.email ? (
+            <span className="text-slate-500 truncate" title={lead.email}>{lead.email}</span>
+          ) : (
+            <span className="text-slate-400 text-[11px] italic">No contact number</span>
+          )}
+          {lead.phone && lead.email && (
+            <>
+              <span className="text-slate-300 dark:text-slate-600 shrink-0">•</span>
+              <span className="text-slate-400 truncate text-[11px]" title={lead.email}>{lead.email}</span>
+            </>
+          )}
         </div>
         
         <div className="flex justify-between items-center text-xs mb-1.5">
@@ -240,13 +260,35 @@ function MobileLeadCard({
         <div className="font-medium text-slate-900 dark:text-white flex items-start gap-2 leading-tight">
           <span className="truncate">{lead.name}</span>
           {lead.phone && (
-            <a href={`tel:${lead.phone}`} onClick={e => e.stopPropagation()} className="text-slate-400 hover:text-green-500 transition-colors shrink-0">
+            <a href={`tel:${lead.phone}`} onClick={e => e.stopPropagation()} className="text-slate-400 hover:text-green-500 transition-colors shrink-0" title={`Call ${lead.phone}`}>
               <Phone className="w-3.5 h-3.5" />
             </a>
           )}
         </div>
         
-        {lead.email && <div className="text-xs text-slate-500 truncate">{lead.email}</div>}
+        <div className="text-xs truncate flex items-center gap-1.5">
+          {lead.phone ? (
+            <a 
+              href={`tel:${lead.phone}`} 
+              onClick={e => e.stopPropagation()} 
+              className="text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium inline-flex items-center gap-1 hover:underline truncate"
+              title={`Call ${lead.phone}`}
+            >
+              <Phone className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span className="truncate">{lead.phone}</span>
+            </a>
+          ) : lead.email ? (
+            <span className="text-slate-500 truncate" title={lead.email}>{lead.email}</span>
+          ) : (
+            <span className="text-slate-400 text-[11px] italic">No contact number</span>
+          )}
+          {lead.phone && lead.email && (
+            <>
+              <span className="text-slate-300 dark:text-slate-600 shrink-0">•</span>
+              <span className="text-slate-400 truncate text-[11px]" title={lead.email}>{lead.email}</span>
+            </>
+          )}
+        </div>
         
         <div className="flex justify-between items-center text-xs mt-1">
           <span className="text-slate-400 truncate pr-2">{lead.source || 'Website'}</span>
